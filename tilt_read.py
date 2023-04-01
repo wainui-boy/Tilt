@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
 
-import pydbus
-import time
+from bluepy.btle import Scanner, DefaultDelegate
+import argparse
 
-# Set the MAC address of your Tilt hydrometer
-tilt_mac_address = "D0:73:3D:6A:48:C5"
 
-# Create a D-Bus proxy object for the Tilt hydrometer's BLE device
-bus = pydbus.SystemBus()
-tilt_device = bus.get("org.bluez", f"/org/bluez/hci0/dev_{tilt_mac_address.replace(':', '_')}")
+class ScanDelegate(DefaultDelegate):
+    def __init__(self):
+        DefaultDelegate.__init__(self)
 
-# Enable notifications for the Tilt hydrometer's characteristic value changes
-tilt_service_uuid = "A495BB50C5B14B44B5121370F02D74DE"
-tilt_characteristic_uuid = "A495BB50C5B14B44B5121370F02D74DE"
-tilt_service = tilt_device.GetService(tilt_service_uuid)
-tilt_characteristic = tilt_service.GetCharacteristic(tilt_characteristic_uuid)
-tilt_characteristic.StartNotify()
+    def handleDiscovery(self, dev, isNewDev, isNewData):
+        if dev.addr == args.mac and isNewData:
+            for (adtype, desc, value) in dev.getScanData():
+                if desc == 'Manufacturer':
+                    temp = int(value[6:10], 16) / 100
+                    gravity = int(value[10:14], 16) / 1000
+                    print("Temperature: %.2f C" % temp)
+                    print("Gravity: %.3f" % gravity)
 
-# Listen for broadcasts from the Tilt hydrometer and print the characteristic values
-while True:
-    value = bytearray(tilt_characteristic.ReadValue({}))
-    color = value[2]
-    temperature = int.from_bytes(value[4:6], byteorder="little") / 100.0
-    gravity = int.from_bytes(value[6:8], byteorder="little") / 1000.0
-    print(f"Color: {color}, Temperature: {temperature}, Gravity: {gravity}")
-    time.sleep(1)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mac", type=str, help="MAC address of Tilt Hydrometer")
+    parser.add_argument("-t", "--timeout", type=int, default=10,
+                        help="scan timeout in seconds (default: 10)")
+    args = parser.parse_args()
+
+    scanner = Scanner().withDelegate(ScanDelegate())
+    devices = scanner.scan(args.timeout)
