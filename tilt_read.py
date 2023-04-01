@@ -19,7 +19,7 @@ tilt_characteristic.StartNotify()
 
 # Listen for broadcasts from the Tilt hydrometer and print the characteristic values
 while True:
-    value = tilt_characteristic.ReadValue({})
+    value = bytearray(tilt_characteristic.ReadValue({}))
     color = value[2]
     temperature = int.from_bytes(value[4:6], byteorder="little") / 100.0
     gravity = int.from_bytes(value[6:8], byteorder="little") / 1000.0
