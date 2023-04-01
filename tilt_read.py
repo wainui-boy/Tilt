@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
 
-import subprocess
+import pydbus
+import time
 
 # Set the MAC address of your Tilt hydrometer
-tilt_mac_address = "04:3E:2A:02:01:03:01"
+tilt_mac_address = "D0:73:3D:6A:48:C5"
 
-# Turn on Bluetooth
-subprocess.call("sudo hciconfig hci0 up", shell=True)
+# Create a D-Bus proxy object for the Tilt hydrometer's BLE device
+bus = pydbus.SystemBus()
+tilt_device = bus.get("org.bluez", f"/org/bluez/hci0/dev_{tilt_mac_address.replace(':', '_')}")
 
-# Scan for nearby Bluetooth LE devices
-subprocess.call("sudo hcitool lescan", shell=True)
+# Enable notifications for the Tilt hydrometer's characteristic value changes
+tilt_service_uuid = "A495BB50C5B14B44B5121370F02D74DE"
+tilt_characteristic_uuid = "A495BB50C5B14B44B5121370F02D74DE"
+tilt_service = tilt_device.GetService(tilt_service_uuid)
+tilt_characteristic = tilt_service.GetCharacteristic(tilt_characteristic_uuid)
+tilt_characteristic.StartNotify()
 
-# Listen for broadcasts from the Tilt hydrometer
-subprocess.call(f"sudo hcitool lecc {tilt_mac_address}", shell=True)
-subprocess.call(f"sudo hcitool ledc {tilt_mac_address} 0x0000", shell=True)
-tilt_output = subprocess.Popen("sudo hcidump --raw", stdout=subprocess.PIPE, shell=True)
-
-# Parse the Tilt hydrometer's data from the broadcast output
-for line in iter(tilt_output.stdout.readline, b''):
-    line = line.decode("utf-8").strip()
-    if "handle" in line and "value" in line:
-        handle, value = line.split(": ")
-        if handle == "handle 0x0014,":
-            # Extract the color, temperature, and gravity values from the broadcast data
-            color = int(value[6:8], 16)
-            temperature = int(value[10:14], 16) / 100.0
-            gravity = int(value[14:18], 16) / 1000.0
-            
-            # Do something with the data (e.g., print it to the console)
-            print(f"Color: {color}, Temperature: {temperature}, Gravity: {gravity}")
+# Listen for broadcasts from the Tilt hydrometer and print the characteristic values
+while True:
+    value = tilt_characteristic.ReadValue({})
+    color = value[2]
+    temperature = int.from_bytes(value[4:6], byteorder="little") / 100.0
+    gravity = int.from_bytes(value[6:8], byteorder="little") / 1000.0
+    print(f"Color: {color}, Temperature: {temperature}, Gravity: {gravity}")
+    time.sleep(1)
