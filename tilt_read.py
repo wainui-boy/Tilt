@@ -6,7 +6,7 @@ import subprocess
 tilt_mac_address = "XX:XX:XX:XX:XX:XX"
 
 # Turn on Bluetooth
-subprocess.call("sudo hciconfig hci0 up", shell=True)
+subprocess.call("sudo hciconfig hci0 up > /dev/null 2>&1 &", shell=True)
 
 # Start scanning for nearby Bluetooth LE devices in the background
 subprocess.Popen("sudo hcitool lescan > /dev/null 2>&1 &", shell=True)
